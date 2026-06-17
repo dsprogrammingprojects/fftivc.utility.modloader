@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Collections.ObjectModel;
+using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
 using System.Buffers.Binary;
 
@@ -24,13 +25,26 @@ using fftivc.utility.modloader.Configuration;
 using fftivc.utility.modloader.Interfaces;
 using fftivc.utility.modloader.Hooks;
 using fftivc.utility.modloader.Overrides;
-using System.Security.Cryptography.X509Certificates;
 
 namespace fftivc.utility.modloader;
 
 public class FFTOModPackManager : IFFTOModPackManager
 {
     public const string MODDED_PACK_NAME = "modded";
+
+    public static readonly FrozenSet<string> KnownLocales = new HashSet<string>()
+    { 
+        // Base Languages
+        "en", // English
+        "ja", // Japanese
+        "de", // Deutsch (German) 
+        "fr", // French
+
+        // Added in ffto 1.5.0
+        "cs", // Chinese (Simplified)
+        "ct", // Chinese (Traditional)
+        "ko"  // Korean
+    }.ToFrozenSet();
 
     #region Private Fields
     private readonly IModConfig _modConfig;
@@ -91,9 +105,9 @@ public class FFTOModPackManager : IFFTOModPackManager
     #endregion
 
     public FFTOModPackManager(
-        IModConfig modConfig, 
-        Reloaded.Mod.Interfaces.ILogger logger, 
-        Config configuration, 
+        IModConfig modConfig,
+        Reloaded.Mod.Interfaces.ILogger logger,
+        Config configuration,
         IReloadedHooks reloadedHooks,
         FFTOResourceManagerHooks resourceManagerHooks)
     {
@@ -281,7 +295,7 @@ public class FFTOModPackManager : IFFTOModPackManager
         if (spl.Length > 2)
         {
             string locale = spl[^2];
-            if (locale == "en" || locale == "ja" || locale == "fr" || locale == "de")
+            if (KnownLocales.Contains(locale))
                 packName = $"{MODDED_PACK_NAME}.{locale}";
         }
         else
@@ -476,7 +490,7 @@ public class FFTOModPackManager : IFFTOModPackManager
         try
         {
             ogNexFileData = PackManagers[gameMode].GetFileData(nexGamePath);
-            
+
             NexDataFile ogNexFile = new NexDataFile();
             ogNexFile.Read(ogNexFileData.Span.ToArray());
 
