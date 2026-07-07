@@ -4784,9 +4784,8 @@ For available flags, refer to https://github.com/Nenkai/fftivc.utility.modloader
     </JobCommand>
 
     <!-- War of the Lions-exclusive additions (see IMPORTANT 3 above) -->
-<JobCommand>
-      <Id>224</Id>
-	  <!--  Darkness  -->
+    <JobCommand>
+      <Id>224</Id> <!--  Darkness / 暗黒  -->
       <ExtendAbilityIdFlagBits>ExtendedAbility5</ExtendAbilityIdFlagBits>
       <ExtendReactionSupportMovementIdFlagBits>ExtendRSMId4, ExtendRSMId3, ExtendRSMId2, ExtendRSMId1</ExtendReactionSupportMovementIdFlagBits>
       <AbilityId1>45</AbilityId1>  <!-- classic: Sanguine Sword -->
@@ -4812,10 +4811,8 @@ For available flags, refer to https://github.com/Nenkai/fftivc.utility.modloader
       <ReactionSupportMovementId5>0</ReactionSupportMovementId5>
       <ReactionSupportMovementId6>0</ReactionSupportMovementId6>
     </JobCommand>
-
-<JobCommand>
-      <Id>225</Id>
-	  <!--  Piracy  -->
+    <JobCommand>
+      <Id>225</Id> <!--  Piracy / 空賊技  -->
       <ExtendAbilityIdFlagBits>ExtendedAbility4, ExtendedAbility9, ExtendedAbility10, ExtendedAbility11, ExtendedAbility12, ExtendedAbility13, ExtendedAbility14, ExtendedAbility15, ExtendedAbility16</ExtendAbilityIdFlagBits>
       <ExtendReactionSupportMovementIdFlagBits>ExtendRSMId6, ExtendRSMId5, ExtendRSMId4, ExtendRSMId3, ExtendRSMId2, ExtendRSMId1</ExtendReactionSupportMovementIdFlagBits>
       <AbilityId1>213</AbilityId1>   <!-- classic: Leg Shot -->
@@ -4841,10 +4838,8 @@ For available flags, refer to https://github.com/Nenkai/fftivc.utility.modloader
       <ReactionSupportMovementId5>463</ReactionSupportMovementId5>  <!-- classic: JP Boost -->
       <ReactionSupportMovementId6>486</ReactionSupportMovementId6>  <!-- classic: Move +1 -->
     </JobCommand>
-
-<JobCommand>
-      <Id>226</Id>
-	  <!--  Huntcraft  -->
+    <JobCommand>
+      <Id>226</Id> <!--  Huntcraft / 狩猟技  -->
       <ExtendAbilityIdFlagBits>0</ExtendAbilityIdFlagBits>
       <ExtendReactionSupportMovementIdFlagBits>ExtendRSMId6, ExtendRSMId5, ExtendRSMId4, ExtendRSMId3, ExtendRSMId2, ExtendRSMId1</ExtendReactionSupportMovementIdFlagBits>
       <AbilityId1>146</AbilityId1>  <!-- classic: Focus -->
