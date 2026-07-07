@@ -1,4 +1,4 @@
-﻿using fftivc.utility.modloader.Configuration;
+using fftivc.utility.modloader.Configuration;
 using fftivc.utility.modloader.Interfaces.Serializers;
 using fftivc.utility.modloader.Interfaces.Tables;
 using fftivc.utility.modloader.Interfaces.Tables.Models;
@@ -27,7 +27,14 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
     public int NumEntries => 176;
     public int MaxId => NumEntries - 1;
 
+    // War of the Lions-exclusive additions: Darkness (Dark Knight), Piracy (Sky Pirate), and
+    // Huntcraft (Game Hunter). Not contiguous with the table above.
+    private const int WotlFirstId = 224;
+    private const int WotlLastId = 226;
+    private const int WotlNumEntries = WotlLastId - WotlFirstId + 1; // 3
+
     private FixedArrayPtr<JOB_COMMAND_DATA> _jobCommandTablePointer;
+    private FixedArrayPtr<JOB_COMMAND_DATA> _warOfTheLionsTablePointer;
 
     public FFTOJobCommandDataManager(Config configuration, IModConfig modConfig, ILogger logger, IStartupScanner startupScanner, IModLoader modLoader,
         IModelSerializer<JobCommandTable> modelTableSerializer)
@@ -40,6 +47,18 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
     {
         var processAddress = Process.GetCurrentProcess().MainModule!.BaseAddress;
 
+        // Pre-size both tables so whichever of the two scans below completes first can fill in
+        // its own range by index. The two scans are independent and unordered relative to each
+        // other - if the War of the Lions one below ever fails to find its signature (e.g. a
+        // future patch shifts it), the main 176-entry table above is unaffected either way.
+        _originalTable = new JobCommandTable();
+        for (int i = 0; i < NumEntries + WotlNumEntries; i++)
+        {
+            int id = i < NumEntries ? i : WotlFirstId + (i - NumEntries);
+            _originalTable.Entries.Add(new JobCommand { Id = id });
+            _moddedTable.Entries.Add(new JobCommand { Id = id });
+        }
+
         _startupScanner.AddMainModuleScan("00 00 FC 92 93 94 95 00 00 00 00 00 00 00 00 00 00 00 00", e =>
         {
             if (!e.Found)
@@ -48,20 +67,44 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
                 return;
             }
 
-            // Go back 5 entries (they're all zeros, which why our AOB starts a bit further.)
             nuint startTableOffset = (nuint)processAddress + (nuint)(e.Offset - (Unsafe.SizeOf<JOB_COMMAND_DATA>() * 5));
             _logger.WriteLine($"[{_modConfig.ModId}] Found {TableFileName} table @ 0x{startTableOffset:X}");
 
             Memory.Instance.ChangeProtection(startTableOffset, sizeof(JOB_COMMAND_DATA) * NumEntries, Reloaded.Memory.Enums.MemoryProtection.ReadWriteExecute);
             _jobCommandTablePointer = new FixedArrayPtr<JOB_COMMAND_DATA>((JOB_COMMAND_DATA*)startTableOffset, NumEntries);
 
-            _originalTable = new JobCommandTable();
             for (int i = 0; i < _jobCommandTablePointer.Count; i++)
             {
                 var jobCommand = JobCommand.FromStructure(i, ref _jobCommandTablePointer.AsRef(i));
+                _originalTable.Entries[i] = jobCommand;
+                _moddedTable.Entries[i] = jobCommand.Clone();
+            }
 
-                _originalTable.Entries.Add(jobCommand);
-                _moddedTable.Entries.Add(jobCommand.Clone());
+#if DEBUG
+            SaveToFolder();
+#endif
+        });
+
+        // Darkness/Piracy/Huntcraft (224-226) Own independent signature.
+        _startupScanner.AddMainModuleScan("08 00 F0 2D B8 DB DC 65 00 00 00 00", e =>
+        {
+            if (!e.Found)
+            {
+                _logger.WriteLine($"[{_modConfig.ModId}] Could not find War of the Lions job commands (224-226)! Dark Knight/Sky Pirate/Game Hunter skillsets won't be moddable, but the rest of {TableFileName} is unaffected.", _logger.ColorRed);
+                return;
+            }
+
+            nuint startTableOffset = (nuint)processAddress + (nuint)e.Offset;
+            _logger.WriteLine($"[{_modConfig.ModId}] Found War of the Lions job commands @ 0x{startTableOffset:X}");
+
+            Memory.Instance.ChangeProtection(startTableOffset, sizeof(JOB_COMMAND_DATA) * WotlNumEntries, Reloaded.Memory.Enums.MemoryProtection.ReadWriteExecute);
+            _warOfTheLionsTablePointer = new FixedArrayPtr<JOB_COMMAND_DATA>((JOB_COMMAND_DATA*)startTableOffset, WotlNumEntries);
+
+            for (int i = 0; i < _warOfTheLionsTablePointer.Count; i++)
+            {
+                var jobCommand = JobCommand.FromStructure(WotlFirstId + i, ref _warOfTheLionsTablePointer.AsRef(i));
+                _originalTable.Entries[NumEntries + i] = jobCommand;
+                _moddedTable.Entries[NumEntries + i] = jobCommand.Clone();
             }
 
 #if DEBUG
@@ -91,7 +134,6 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
             if (jobCommandTable is null)
                 return;
 
-            // Don't do changes just yet. We need the original table, the scan might not have been completed yet.
             _modTables.Add(modId, jobCommandTable);
         }
         catch (Exception ex)
@@ -101,12 +143,28 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
         }
     }
 
+    // Ids 0-175 map to their own index directly same as before. 224-226 map to the 3 slots
+    // appended right after indices 176-178 - matching how they're laid out in the
+    // original PSP data per FFTPatcher's parser.
+    protected override int IdToIndex(int id) => id <= MaxId ? id : NumEntries + (id - WotlFirstId);
+
+    private bool IsValidId(int id) => id <= MaxId || (id >= WotlFirstId && id <= WotlLastId);
+
+    private ref JOB_COMMAND_DATA GetDataRef(int id)
+    {
+        if (id <= MaxId)
+            return ref _jobCommandTablePointer.AsRef(id);
+
+        return ref _warOfTheLionsTablePointer.AsRef(id - WotlFirstId);
+    }
+
     public override void ApplyTablePatch(string modId, JobCommand jobCommand)
     {
         TrackModelChanges(modId, jobCommand);
 
-        JobCommand previous = _moddedTable.Entries[jobCommand.Id];
-        ref JOB_COMMAND_DATA jobCommandData = ref _jobCommandTablePointer.AsRef(jobCommand.Id);
+        int index = IdToIndex(jobCommand.Id);
+        JobCommand previous = _moddedTable.Entries[index];
+        ref JOB_COMMAND_DATA jobCommandData = ref GetDataRef(jobCommand.Id);
         jobCommandData.ExtendAbilityIdFlagBits = (ExtendAbilityIdFlags)(jobCommand.ExtendAbilityIdFlagBits ?? previous.ExtendAbilityIdFlagBits)!;
         jobCommandData.ExtendReactionSupportMovementIdFlagBits = (ExtendReactionSupportMovementIdFlags)(jobCommand.ExtendReactionSupportMovementIdFlagBits ?? previous.ExtendReactionSupportMovementIdFlagBits)!;
         SetAbility(ref jobCommandData, previous, jobCommand, 0);
@@ -173,17 +231,17 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
 
     public JobCommand GetOriginalJobCommand(int index)
     {
-        if (index > MaxId)
-            throw new ArgumentOutOfRangeException(nameof(index), $"Job command id can not be more than {MaxId}!");
+        if (!IsValidId(index))
+            throw new ArgumentOutOfRangeException(nameof(index), $"Job command id must be 0-{MaxId}, or {WotlFirstId}-{WotlLastId}!");
 
-        return _originalTable.Entries[index];
+        return _originalTable.Entries[IdToIndex(index)];
     }
 
     public JobCommand GetJobCommand(int index)
     {
-        if (index > MaxId)
-            throw new ArgumentOutOfRangeException(nameof(index), $"Job command id can not be more than {MaxId}!");
+        if (!IsValidId(index))
+            throw new ArgumentOutOfRangeException(nameof(index), $"Job command id must be 0-{MaxId}, or {WotlFirstId}-{WotlLastId}!");
 
-        return _moddedTable.Entries[index];
+        return _moddedTable.Entries[IdToIndex(index)];
     }
 }
