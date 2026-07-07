@@ -28,8 +28,7 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
     public int MaxId => NumEntries - 1;
 
     // War of the Lions-exclusive additions: Darkness (Dark Knight), Piracy (Sky Pirate), and
-    // Huntcraft (Game Hunter). Not contiguous with the table above - found via their own
-    // independent signature below rather than assumed to sit at a fixed offset after it.
+    // Huntcraft (Game Hunter). Not contiguous with the table above.
     private const int WotlFirstId = 224;
     private const int WotlLastId = 226;
     private const int WotlNumEntries = WotlLastId - WotlFirstId + 1; // 3
@@ -68,7 +67,6 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
                 return;
             }
 
-            // Go back 5 entries (they're all zeros, which why our AOB starts a bit further.)
             nuint startTableOffset = (nuint)processAddress + (nuint)(e.Offset - (Unsafe.SizeOf<JOB_COMMAND_DATA>() * 5));
             _logger.WriteLine($"[{_modConfig.ModId}] Found {TableFileName} table @ 0x{startTableOffset:X}");
 
@@ -87,9 +85,7 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
 #endif
         });
 
-        // Darkness/Piracy/Huntcraft (224-226). Own independent signature (courtesy of Nenkai's
-        // review) rather than an assumed offset from the table above - lands directly on the
-        // start of entry 224, no backward walk needed.
+        // Darkness/Piracy/Huntcraft (224-226) Own independent signature.
         _startupScanner.AddMainModuleScan("08 00 F0 2D B8 DB DC 65 00 00 00 00", e =>
         {
             if (!e.Found)
@@ -138,7 +134,6 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
             if (jobCommandTable is null)
                 return;
 
-            // Don't do changes just yet. We need the original table, the scan might not have been completed yet.
             _modTables.Add(modId, jobCommandTable);
         }
         catch (Exception ex)
@@ -148,13 +143,12 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
         }
     }
 
-    // Ids 0-175 map to their own index directly, same as before. 224-226 map to the 3 slots
-    // appended right after (indices 176-178) - matching how they're actually laid out in the
-    // original PSP data too, per FFTPatcher's parser.
-    private static int IdToIndex(int id) => id <= WotlFirstId - 1 ? id : NumEntriesConst + (id - WotlFirstId);
-    private const int NumEntriesConst = 176;
+    // Ids 0-175 map to their own index directly same as before. 224-226 map to the 3 slots
+    // appended right after indices 176-178 - matching how they're laid out in the
+    // original PSP data per FFTPatcher's parser.
+    protected override int IdToIndex(int id) => id <= MaxId ? id : NumEntries + (id - WotlFirstId);
 
-    private static bool IsValidId(int id) => id <= NumEntriesConst - 1 || (id >= WotlFirstId && id <= WotlLastId);
+    private bool IsValidId(int id) => id <= MaxId || (id >= WotlFirstId && id <= WotlLastId);
 
     private ref JOB_COMMAND_DATA GetDataRef(int id)
     {
