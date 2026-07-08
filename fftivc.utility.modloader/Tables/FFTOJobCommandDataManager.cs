@@ -43,7 +43,7 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
         _modelTableSerializer = modelTableSerializer;
     }
 
-    public void Init()
+    public unsafe void Init()
     {
 
         // Two tables - one that represents id 0-176, the other represents 224-226
