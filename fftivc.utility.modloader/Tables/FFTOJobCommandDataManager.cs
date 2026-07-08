@@ -31,7 +31,7 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
     // Huntcraft (Game Hunter). Not contiguous with the table above.
     private const int WotlFirstId = 224;
     private const int WotlLastId = 226;
-    private const int WotlNumEntries = WotlLastId - WotlFirstId + 1; // 3
+    private const int WotlNumEntries = (WotlLastId - WotlFirstId) + 1; // 3
 
     private FixedArrayPtr<JOB_COMMAND_DATA> _jobCommandTablePointer;
     private FixedArrayPtr<JOB_COMMAND_DATA> _warOfTheLionsTablePointer;
@@ -43,14 +43,12 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
         _modelTableSerializer = modelTableSerializer;
     }
 
-    public unsafe void Init()
+    public void Init()
     {
-        var processAddress = Process.GetCurrentProcess().MainModule!.BaseAddress;
 
-        // Pre-size both tables so whichever of the two scans below completes first can fill in
-        // its own range by index. The two scans are independent and unordered relative to each
-        // other - if the War of the Lions one below ever fails to find its signature (e.g. a
-        // future patch shifts it), the main 176-entry table above is unaffected either way.
+        // Two tables - one that represents id 0-176, the other represents 224-226
+
+        var processAddress = Process.GetCurrentProcess().MainModule!.BaseAddress;
         _originalTable = new JobCommandTable();
         for (int i = 0; i < NumEntries + WotlNumEntries; i++)
         {
@@ -85,7 +83,7 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
 #endif
         });
 
-        // Darkness/Piracy/Huntcraft (224-226) Own independent signature.
+        // Darkness/Piracy/Huntcraft (224-226)
         _startupScanner.AddMainModuleScan("08 00 F0 2D B8 DB DC 65 00 00 00 00", e =>
         {
             if (!e.Found)
@@ -146,9 +144,16 @@ public class FFTOJobCommandDataManager : FFTOTableManagerBase<JobCommandTable, J
     // Ids 0-175 map to their own index directly same as before. 224-226 map to the 3 slots
     // appended right after indices 176-178 - matching how they're laid out in the
     // original PSP data per FFTPatcher's parser.
-    protected override int IdToIndex(int id) => id <= MaxId ? id : NumEntries + (id - WotlFirstId);
+    protected override int IdToIndex(int id)
+    {
+        if (id <= MaxId)
+            return id;
+        else
+            return NumEntries + (id - WotlFirstId);
+    }
 
-    private bool IsValidId(int id) => id <= MaxId || (id >= WotlFirstId && id <= WotlLastId);
+    private bool IsValidId(int id) 
+        => id <= MaxId || (id >= WotlFirstId && id <= WotlLastId);
 
     private ref JOB_COMMAND_DATA GetDataRef(int id)
     {
