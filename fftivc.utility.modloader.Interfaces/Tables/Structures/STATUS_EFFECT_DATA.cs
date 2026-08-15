@@ -41,7 +41,7 @@ public enum StatusCheckFlags : ushort
     CrystalTreasure = 1 << 6,
     FreezeCT = 1 << 7,
     Check8 = 1 << 8,
-    Check9 = 1 << 9,
+    ImmortalCancels = 1 << 9,
     Check10 = 1 << 10,
     Check11 = 1 << 11,
     Check12 = 1 << 12,
